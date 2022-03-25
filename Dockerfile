@@ -18,6 +18,3 @@ COPY --from=builder /go/bin/bombardier /root/go/bin/bombardier
 COPY src/ /client
 
 ENTRYPOINT [ "python", "./main.py" ]
-
-RUN curl -o MHDDoS/config.json https://raw.githubusercontent.com/Aruiem234/mhddosproxy/main/proxies_config.json
-RUN curl -o MHDDoS/files/proxies/proxylist.txt https://raw.githubusercontent.com/porthole-ascend-cinnamon/proxy_scraper/main/proxies.txt
