@@ -10,3 +10,4 @@ README.md
 .gitmodules
 local_install(Linux).sh
 Dockerfile
+.gitlab-ci.yml
