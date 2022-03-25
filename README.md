@@ -21,6 +21,8 @@
 
 [📟Telegram](https://t.me/CyberSpace_UA)
 
+[🖥YouTube](https://www.youtube.com/channel/UCT_I4DRKngHsyHI4SQIdlmQ)
+
 ## ❓ Що це:
 
 **Скрипт-обгортка для запуску потужного DDoS інструмента [MHDDoS](https://github.com/MHProDev/MHDDoS)**
