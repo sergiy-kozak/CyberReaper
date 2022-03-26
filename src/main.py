@@ -19,9 +19,6 @@ import MHDDoS.start as MHDDoS
 
 from proxies import update_file
 
-import ctypes
-libgcc_s = ctypes.CDLL('libgcc_s.so.1')
-
 getLogger('proxies').setLevel("CRITICAL")
 
 basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s',
