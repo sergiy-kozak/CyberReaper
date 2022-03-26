@@ -80,18 +80,19 @@ def customDecoder(Obj):
     return namedtuple('X', Obj.keys())(*Obj.values())
 
 
-def runner(config):
+def runner(config, cpu_limit, threads_limit=0):
     if int(config.Duration) > loop_time:
         period = loop_time
     else:
         period = config.Duration
+    cfg_threads = config.Threads if threads_limit <= 0 else threads_limit
     if config.UseProxy:
         if config.Proto in l7:
             params = [
                 str(config.Proto),
                 str(config.Dst),
                 str(config.ProxyType),
-                str(config.Threads if thread_limit <= 0 else thread_limit),
+                str(cfg_threads),
                 str(config.ProxyList),
                 str(config.RPC),
                 str(period)
@@ -100,7 +101,7 @@ def runner(config):
             params = [
                 str(config.Proto),
                 str(config.Dst),
-                str(config.Threads if thread_limit <= 0 else thread_limit),
+                str(cfg_threads),
                 str(period),
                 str(config.ProxyType),
                 str(config.ProxyList)
@@ -110,7 +111,7 @@ def runner(config):
             params = [
                 str(config.Proto),
                 str(config.Dst),
-                str(config.Threads if thread_limit <= 0 else thread_limit),
+                str(cfg_threads),
                 str(period)
             ]
         else:
@@ -133,7 +134,7 @@ def runner(config):
 if __name__ == '__main__':
 
     pool_size = int(argv[1]) if len(argv) >= 2 else int(psutil.cpu_count() / 2)
-    thread_limit = int(argv[2]) if len(argv) >= 3 else 0
+    max_threads = int(argv[2]) if len(argv) >= 3 else 0
     cpu_limit = int(argv[3]) if len(argv) >= 4 else 70
 
     logger.info('''
@@ -163,7 +164,7 @@ if __name__ == '__main__':
             logger.info("Getting fresh tasks from the server!")
             try:
                 for conf in json.loads(urlopen(url).read(), object_hook=customDecoder):
-                    pool.add_task(runner, conf)
+                    pool.add_task(runner, conf, cpu_limit, threads_limit=max_threads)
                     sleep(loop_time / 4)
                 pool.wait_completion()
 
@@ -177,3 +178,4 @@ if __name__ == '__main__':
     except Exception as error:
         logger.critical(f"OOPS... We faced an issue: {error}")
         logger.info("Please restart the tool! Thanks")
+
