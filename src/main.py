@@ -7,7 +7,7 @@ import sys
 
 from collections import namedtuple
 from logging import basicConfig, getLogger
-from pathlib import Path
+from proxies import update_file
 from queue import Queue
 from socket import gethostname
 from sys import argv
@@ -15,15 +15,11 @@ from threading import Thread
 from time import sleep
 from urllib.request import urlopen
 
-import MHDDoS.start as MHDDoS
-
-from proxies import update_file
-
-getLogger('proxies').setLevel("CRITICAL")
 
 basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s',
             datefmt="%H:%M:%S")
 
+getLogger('proxies').setLevel("CRITICAL")
 logger = getLogger("Bot Runner")
 logger.setLevel("INFO")
 
