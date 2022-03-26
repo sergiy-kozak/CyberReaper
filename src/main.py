@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import argparse
 import json
 import psutil
 import subprocess
@@ -129,10 +129,6 @@ def runner(config, cpu_limit, threads_limit=0):
 
 if __name__ == '__main__':
 
-    pool_size = int(argv[1]) if len(argv) >= 2 else int(psutil.cpu_count() / 2)
-    max_threads = int(argv[2]) if len(argv) >= 3 else 0
-    cpu_limit = int(argv[3]) if len(argv) >= 4 else 70
-
     logger.info('''
   ____      _               ____                         _   _   _   _    
  / ___|   _| |__   ___ _ __/ ___| _ __   __ _  ___ ___  | | | | | | / \   
@@ -141,8 +137,34 @@ if __name__ == '__main__':
  \____\__, |_.__/ \___|_|  |____/| .__/ \__,_|\___\___| | |  \___/_/   \_\ 
       |___/                      |_|                    |_|               
 ''')
+    parser = argparse.ArgumentParser(prog="cyberreaper")
+    parser.add_argument("-a", "--max-attacks",
+                        action="store",
+                        required=False,
+                        type=int,
+                        default=psutil.cpu_count() // 2,
+                        help="Maximum amount of the attacks executed in parallel (attack pool size).")
+    parser.add_argument("-t", "--attack-threads-limit",
+                        action="store",
+                        required=False,
+                        type=int,
+                        default=0,
+                        help="Limit amount of the threads for every attack. If value >0, it overrules the "
+                             "attack's task configuration 'Threads' parameter provided that has higher "
+                             "value compared to this option's value.")
+    parser.add_argument("-c", "--cpu-limit",
+                        action="store",
+                        required=False,
+                        type=int,
+                        default=70,
+                        help="Limit the CPU usage by attacks to the specified value.")
 
-    logger.info(f"Task server {url}")
+    args = parser.parse_args()
+    pool_size = args.max_attacks
+    max_threads = args.attack_threads_limit
+    cpu_limit = args.cpu_limit
+
+    logger.info(f"Fetch tasks URL: {url}")
 
     try:
         pool = ThreadPool(pool_size)
