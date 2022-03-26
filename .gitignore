@@ -1,6 +1,5 @@
 # ignore ALL .log files
-#*.log
+*.pyc
 # ignore ALL files in ANY directory named temp
-#src/MHDDoS/
-src/venv/
-.env/
+.env
+__pycache__
