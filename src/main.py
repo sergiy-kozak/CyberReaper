@@ -113,6 +113,7 @@ def runner(config, cpu_limit, threads_limit=0):
         else:
             logger.info(
                 'No we cant run the LEVEL7 attacks without proxy. Skipping')
+            return
     try:
         cpu_usage = psutil.cpu_percent(4)
         while cpu_usage > cpu_limit:
