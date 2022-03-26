@@ -10,7 +10,6 @@ from logging import basicConfig, getLogger
 from proxies import update_file
 from queue import Queue
 from socket import gethostname
-from sys import argv
 from threading import Thread
 from time import sleep
 from urllib.request import urlopen
