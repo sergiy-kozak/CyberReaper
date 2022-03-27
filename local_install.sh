@@ -32,7 +32,7 @@ pip install -r ${WORKDIR}/src/MHDDoS/requirements.txt
 
 pushd ${WORKDIR}/src/
 
-python bot_runner.py
+python main.py
 
 popd
 popd
