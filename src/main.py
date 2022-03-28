@@ -24,7 +24,7 @@ logger.setLevel("INFO")
 host = "https://ua-cyber.space"
 
 url = f"{host}/api/v2/tasks/json/?hostname={gethostname()}&cpu_count={psutil.cpu_count()}"
-counters = f"{host}/api/v3/tasks/stats/"
+counters = f"{host}/api/v2/tasks/stats/"
 
 loop_time = 60
 RETRY_PERIOD_SEC = 30
