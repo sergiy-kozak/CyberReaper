@@ -105,6 +105,8 @@ optional arguments:
                         Limit amount of the threads for every attack. If value >0, it overrules the attack's task configuration 'Threads' parameter provided that has higher value compared to this option's value.
   -c CPU_LIMIT, --cpu-limit CPU_LIMIT
                         Limit the CPU usage by attacks to the specified value.
+  --use-proxy, --no-use-proxy
+                        Use proxies (default: True)
 ```
 
 **-a/--max-attacks** - кількість задач, що запускаються одночасно
@@ -117,25 +119,6 @@ docker run -ti --rm --dns 8.8.8.8 egideon/cyber-reaper -a 2 -t 10 -c 40
 ```
 Тобто: Дві копії (задачі) по 10 потоків, відтак разом дають 20 потоків, та усе це має поміститися до 40% на процесорі.
 **Зверніть увагу** що **для Windows** це значення вимірюється **в одиницях**.
-
-4. Проблеми при отриманні нових завдань
-Отже є проблема з DNS. Вона може бути як на стороні провайдера так і на стороні домашнього роутера.
-
-Помилка виглядає приблизно так:
-```
-[14:05:56 - INFO] Get fresh proxies. Please wait...
-[14:06:18 - CRITICAL] OOPS... We faced an issue: [Errno 11001] getaddrinfo failed
-[14:06:18 - INFO] Please restart the tool! Thanks
-```
-
-Фікситься через додавання рядка до файлу **hosts**:
-```
-185.65.245.57 ua-cyber.space
-```
-**Windows**: C:\Windows\System32\drivers\etc\hosts
-**Linux**: /etc/hosts
-Так, це погано, але наразі кращого та швидшого рішення не має.
-Буду радий спробувати Ваш метод вирішення.
 
 
 ## 💡 FAQs
