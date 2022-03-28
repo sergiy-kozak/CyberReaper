@@ -105,6 +105,8 @@ optional arguments:
                         Limit amount of the threads for every attack. If value >0, it overrules the attack's task configuration 'Threads' parameter provided that has higher value compared to this option's value.
   -c CPU_LIMIT, --cpu-limit CPU_LIMIT
                         Limit the CPU usage by attacks to the specified value.
+  --use-proxy, --no-use-proxy
+                        Use proxies (default: True)
 ```
 
 **-a/--max-attacks** - кількість задач, що запускаються одночасно
