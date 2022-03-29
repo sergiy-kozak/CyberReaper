@@ -104,6 +104,12 @@ def run_mhddos(start_args: list):
         logger.info(f"OOPS... {start_args[:2]} -> Issue: {ex}")
 
 
+class TooFewProxiesError(RuntimeError):
+
+    def __init__(self, proxies_count):
+        super(TooFewProxiesError, self).__init__(f"Too few working proxies has been loaded: {proxies_count}")
+
+
 if __name__ == '__main__':
 
     logger.info('''
@@ -141,6 +147,12 @@ if __name__ == '__main__':
                         type=bool,
                         default=True,
                         help="Use proxies")
+    parser.add_argument("-p", "--min-proxies-needed",
+                        action="store",
+                        required=False,
+                        type=int,
+                        default=10000,
+                        help="Minimum amount of working (alive) proxies required, defaults to 10000.")
 
     args = parser.parse_args()
     pool_size = args.max_attacks
@@ -152,14 +164,15 @@ if __name__ == '__main__':
 
     pool = ThreadPoolExecutor(max_workers=pool_size)
     try:
+        # import it here locally, otherwise logging config is screwed
+        from proxies import refresh_proxies, update_proxies_file
+        _proxies = []
         if use_proxy:
             logger.info("Get fresh proxies. Please wait...")
-            from proxies import update_file  # import it here locally, otherwise logging config is screwed
-            update_file()
-        else:
-            with open('MHDDoS/files/proxies/proxylist.txt', 'w') as emty:
-                emty.writelines('')
-
+            _proxies = refresh_proxies()
+            if len(_proxies) < args.min_proxies_needed:
+                raise TooFewProxiesError(len(_proxies))
+        update_proxies_file(_proxies)  # will leave empty file if _proxies=[]
         while True:
             logger.info("Getting fresh tasks from the server!")
             try:
@@ -195,6 +208,9 @@ if __name__ == '__main__':
                 logger.critical(f"OOPS... We faced an issue: {error}")
                 logger.info(f"Retrying in {RETRY_PERIOD_SEC}")
                 sleep(RETRY_PERIOD_SEC)
+    except TooFewProxiesError as tfpe:
+        logger.error(f"Could not load sufficient amount of proxies: {tfpe}")
+        logger.error("To continue, you can restart the application with reduced --min-proxies-needed option value.")
     except KeyboardInterrupt:
         logger.info("Shutting down... Ctrl + C")
     except Exception as error:

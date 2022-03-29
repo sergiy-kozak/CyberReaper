@@ -6,6 +6,7 @@ from base64 import b64decode
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
+import typing
 from PyRoxy import ProxyType, Proxy
 import logging
 
@@ -317,30 +318,28 @@ def check_proxies(proxies):
                 yield future_to_proxy[future]
 
 
-def update_file():
-    expected_at_least = 10000
+def refresh_proxies():
     proxies = set(scrape_all())
     logger.info(f'Proxies: {len(proxies)}')
-    if len(proxies) < expected_at_least:
-        logger.error('Found too few proxies')
-        exit(1)
-
     proxies = [
         Proxy(ip, int(port), proto)
         for ip, port, proto in proxies
     ]
-
     random.shuffle(proxies)
-    #working_proxies = list(check_proxies(proxies))
-    
-    #expected_at_least = 400
-    #if len(working_proxies) < expected_at_least:
-    #    print(f'Found too few working proxies: {len(working_proxies)}')
-    #    exit(1)
+    return proxies
 
-    with open('MHDDoS/files/proxies/proxylist.txt', 'w') as out:
+
+
+def update_proxies_file(proxies: typing.List[Proxy], proxies_file_path="MHDDoS/files/proxies/proxylist.txt"):
+    with open(proxies_file_path, 'w') as out:
         out.writelines((str(proxy) + '\n' for proxy in proxies))
 
 
 if __name__ == '__main__':
-    update_file()
+    expected_at_least = 10000
+    proxies = refresh_proxies()
+    if len(proxies)  < expected_at_least:
+        logger.error('Found too few proxies')
+        exit(1)
+    update_proxies_file(proxies)
+
