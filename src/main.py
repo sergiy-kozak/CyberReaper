@@ -120,6 +120,7 @@ if __name__ == '__main__':
  \____\__, |_.__/ \___|_|  |____/| .__/ \__,_|\___\___| | |  \___/_/   \_\ 
       |___/                      |_|                    |_|               
 ''')
+    python_is_39_or_newer = sys.version_info[1] >= 9  # python is 3.9 or earlier
     parser = argparse.ArgumentParser(prog="cyberreaper")
     parser.add_argument("-a", "--max-attacks",
                         action="store",
@@ -141,12 +142,23 @@ if __name__ == '__main__':
                         type=int,
                         default=70,
                         help="Limit the CPU usage by attacks to the specified value.")
-    parser.add_argument("--use-proxy",
-                        action=argparse.BooleanOptionalAction,
-                        required=False,
-                        type=bool,
-                        default=True,
-                        help="Use proxies")
+    if python_is_39_or_newer:
+        # argparse.BooleanOptionalAction exists since python 3.9
+        parser.add_argument("--use-proxy",
+                            action=argparse.BooleanOptionalAction,
+                            required=False,
+                            type=bool,
+                            default=True,
+                            help="Use proxies")
+    else:
+        # in earlier versions, action="store_true" can be used; however, the setup below
+        # doesn't fully replicate the above command-line option --use-proxy/--no-use-proxy,
+        # only --no-use-proxy can be set. Still, it will allow to achieve exactly same effect
+        # at the end.
+        parser.add_argument("-n", "--no-use-proxy",
+                            action="store_true",
+                            required=False,
+                            help="Don't use proxies")
     parser.add_argument("-p", "--min-proxies-needed",
                         action="store",
                         required=False,
@@ -158,7 +170,7 @@ if __name__ == '__main__':
     pool_size = args.max_attacks
     max_threads = args.attack_threads_limit
     cpu_limit = args.cpu_limit
-    use_proxy = args.use_proxy
+    use_proxy = args.use_proxy if python_is_39_or_newer else not args.no_use_proxy  # based on python version
 
     logger.info(f"Fetch tasks URL: {url}")
 
