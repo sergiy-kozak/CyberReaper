@@ -229,4 +229,18 @@ if __name__ == '__main__':
         logger.critical(f"OOPS... We faced an issue: {error}")
         logger.info("Please restart the tool! Thanks")
     finally:
-        pool.shutdown(wait=False, cancel_futures=True)
+        if python_is_39_or_newer:
+            # in python < 3.9, no 'cancel_futures' kwarg is available
+            pool.shutdown(wait=False, cancel_futures=True)
+        else:
+            # below you see poor-man-solution for cancel_futures=True in python < 3.9.
+            # Well, it was tested to work.
+            q = pool._work_queue
+            if not q.empty():
+                import queue
+                try:
+                    while True:
+                        q.get(block=False)
+                except queue.Empty:
+                    pass
+            pool.shutdown(wait=False)
